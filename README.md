@@ -38,8 +38,6 @@
 
 ---
 
-
-
 ## Installation
 
 Install this via pip (or your favourite package manager):
