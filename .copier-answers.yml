@@ -1,0 +1,23 @@
+# Changes here will be overwritten by Copier
+_commit: 4eb1910
+_src_path: gh:browniebroke/pypackage-template
+add_me_as_contributor: false
+cli_name: shok
+copyright_year: '2025'
+documentation: true
+email: benjamin.etheredge@gmail.com
+full_name: Benjamin Etheredge
+github_username: benjamin-etheredge
+has_cli: true
+initial_commit: false
+is_django_package: false
+open_source_license: MIT
+open_with_editor: false
+package_name: shok
+project_name: shok
+project_short_description: ''
+project_slug: shok
+run_uv_sync: false
+setup_github: false
+setup_pre_commit: false
+
