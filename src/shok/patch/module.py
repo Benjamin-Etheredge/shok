@@ -87,14 +87,27 @@ class ObjectDetectionPatch(LightningModule):
         clip_values: tuple[float, float] | None = (0, 255),
         use_y_hat: bool = False,
         gamma: float = 0.995,
-        base_image_mutator: v2.Compose | bool | None = None,  # this should probably be in data module
-        patched_image_mutator: v2.Compose | bool = False,
+        patch_combiner: torch.nn.Module | None = None,
+        val_patch_combiner: torch.nn.Module | None = None,
+        # base_image_mutator: torch.nn.Module | bool | None = None,  # this should probably be in data module
+        patched_image_transforms: torch.nn.Module | None = None,
+        val_patched_image_transforms: torch.nn.Module | None = None,
         # TODO make scheduler
         eot_samples: int = 1,
+        eot_rate: int = 32,
         # TODO should this just get pulled/set from the trainer?
     ):
         super().__init__()
-        self.save_hyperparameters(ignore=["model", "summary_writer"])
+        self.save_hyperparameters(
+            ignore=[
+                "model",
+                "summary_writer",
+                "patch_combiner",
+                "val_patch_combiner",
+                "patched_image_transforms",
+                "val_patched_image_transforms",
+            ]
+        )
         self.model = model
 
         # TODO test speed with and without this
@@ -109,42 +122,52 @@ class ObjectDetectionPatch(LightningModule):
         )
         self.patch = torch.nn.Parameter(patch, requires_grad=True)
 
-        # TODO use this
-        if patched_image_mutator:
-            # Patched image should be muted
-            # TODO pull out
-            self.patched_image_mutator = (
-                self.default_patched_image_mutator() if patched_image_mutator is True else patched_image_mutator
-            )
-        else:
-            self.patched_image_mutator = v2.Identity()
-
         # TODO use "erase" transforms for comparing patching vs no patching
-        # TODO break up combiner and mutator?
+
+        # TODO adjust all transforms to work with multiple inputs
         # TODO adjust combiner to work with multiple inputs
-        self.combiner = ApplyPatch()
-        self.other_transforms = v2.Compose(
+        if patch_combiner is None:
+            patch_combiner = ApplyPatch()
+        self.patch_combiner = patch_combiner
+
+        if patched_image_transforms is None:
+            patched_image_transforms = v2.Identity()
+
+        # TODO assert transforms don't go outside clip values
+        # These other transforms are needed for the generation
+        self.patched_image_transforms = v2.Compose(
             [
                 SoftRound(),
-                self.patched_image_mutator,
+                patched_image_transforms,
+                # SoftRound(),
                 ScaleGradTransform(),
                 ScaleImageValues(min=clip_values[0], max=clip_values[1]),
                 ConvertToTVTensorBBoxes(),
                 v2.SanitizeBoundingBoxes(),
             ]
         )
-        self.eval_combiner = v2.Compose(
-            [
-                # SimpleApplyPatch(),
-                ScaleApplyPatch(0.25),
-                PassRound(),
-                ScaleImageValues(min=clip_values[0], max=clip_values[1]),
-                ConvertToTVTensorBBoxes(),
-                v2.SanitizeBoundingBoxes(),
-            ]
-        )
+
+        if val_patch_combiner is None:
+            val_patch_combiner = ScaleApplyPatch(0.25)
+        self.val_patch_combiner = val_patch_combiner
+
+        if val_patched_image_transforms is None:
+            val_patched_image_transforms = v2.Compose(
+                [
+                    PassRound(),
+                    ScaleImageValues(min=clip_values[0], max=clip_values[1]),
+                    ConvertToTVTensorBBoxes(),
+                    v2.SanitizeBoundingBoxes(),
+                ]
+            )
+        self.val_patched_image_transforms = val_patched_image_transforms
+
         self.automatic_optimization = False
+
+        self.eot_samples = eot_samples
+
         # TODO pull out or move to setup
+        # TODO move to callback
         self.eval_maps = torch.nn.ModuleList(
             [
                 torchmetrics.detection.MeanAveragePrecision(
@@ -218,23 +241,9 @@ class ObjectDetectionPatch(LightningModule):
         else:
             self.model.eval()
 
-    # def on_validation_model_eval(self):
-    #     pass
-    #     # return super().on_validation_model_eval()
-    # def on_validation_model_train(self):
-    #     pass
-    #     # return super().on_validation_model_train()
-
     # TODO explore overriding configure gradient clipping for scalling
     def configure_optimizers(self):
         """Configure the optimizer for the patch."""
-        # return CustomOptimizer(
-        #     [self.patch],
-        #     lr=self.hparams.learning_rate,
-        # )
-        # TODO make param
-        # opt = SubPixelOptimizer([self.patch], lr=self.hparams.learning_rate)
-        # TODO test adam more with custom grad adjustments
         opt = torch.optim.Adam(
             [self.patch],
             lr=self.hparams.learning_rate,
@@ -247,22 +256,9 @@ class ObjectDetectionPatch(LightningModule):
             step_size=1,  # this only steps every update
             gamma=self.hparams.gamma,
         )
-        # return opt, lr_scheduler
         return {
             "optimizer": opt,
             "lr_scheduler": lr_scheduler,
-            # "monitor": "val_loss",
-            # "frequency": self.hparams.sample_size,  # Update every epoch
-            # "name": "patch_optimizer",
-            # "scheduler": {
-            #     "scheduler": torch.optim.lr_scheduler.StepLR(
-            #         opt,
-            #         step_size=self.trainer.max_epochs // 10,
-            #         gamma=0.9,
-            #     ),
-            #     "interval": "epoch",  # Update every epoch
-            #     "frequency": 1,  # Update every epoch
-            # },
         }
 
     def on_validation_epoch_start(self):
@@ -274,14 +270,32 @@ class ObjectDetectionPatch(LightningModule):
         """
         self.train(False)
 
+    @staticmethod
+    def _apply_patch(x, patch, y, combiner):
+        """
+        Applies the adversarial patch to the input images.
+
+        TODO make combiner work on multiple inputs and targets with one call instead of a loop
+
+        Args:
+            x (List[torch.Tensor]): Input images.
+            patch (torch.Tensor): Adversarial patch.
+            y (List[torch.Tensor]): Corresponding targets.
+            combiner (callable): Function to combine images and patch.
+
+        Returns:
+            tuple: Transformed images and targets after applying the patch.
+
+        """
+        x, y = zip(*[combiner(image, patch, target) for image, target in zip(x, y)])
+        return x, y
+
     def validation_step(self, batch, batch_idx, dataloader_idx):
         """Validation step for the patch."""
         # TODO implement a validation step for the patch
-        # self.model.eval()
-        # self.eval()
         x, y = batch
-        combined_batch = [self.eval_combiner(image, self.patch, target) for image, target in zip(x, y)]
-        x, y = zip(*combined_batch)
+        x, y = self._apply_patch(x, self.patch, y, self.val_patch_combiner)
+        x, y = zip(*[self.val_patched_image_transforms(image, target) for image, target in zip(x, y)])
 
         detections = self.model(x, y)
 
@@ -333,9 +347,10 @@ class ObjectDetectionPatch(LightningModule):
         """
         for _ in range(self.eot_samples):
             eot_batch = ([], [])
+            # new_x, new_y = self._apply_patch(image, self.patch, target, self.patch_combiner)
             for image, target in zip(batch[0], batch[1]):
-                new_x, new_y = self.combiner(image, self.patch, target)
-                new_x, new_y = self.other_transforms(new_x, new_y)
+                new_x, new_y = self.patch_combiner(image, self.patch, target)
+                new_x, new_y = self.patched_image_transforms(new_x, new_y)
                 eot_batch[0].append(new_x)
                 eot_batch[1].append(new_y)
             yield eot_batch
@@ -361,21 +376,6 @@ class ObjectDetectionPatch(LightningModule):
         # TODO should this always update on last batch?
         # TODO if I set grad_accumulation_steps to be num of batches, no logic needed
 
-    def on_train_batch_start(self, batch, batch_idx):
-        """
-        Called at the start of each training batch.
-
-        Args:
-            batch (Any): The current batch of data.
-            batch_idx (int): Index of the current batch.
-
-        Side Effects:
-            Increments `self.record_count` by the size of the batch.
-
-        """
-        batch_size = len(batch[0])
-        self.record_count += batch_size
-
     def on_train_epoch_end(self):
         """
         Called at the end of each training epoch.
@@ -387,7 +387,8 @@ class ObjectDetectionPatch(LightningModule):
             - Updates `self.eot_samples` if the current epoch is a multiple of 16.
             - Logs the value of `eot_samples` with the key "eot_samples".
         """
-        if (self.current_epoch + 1) % 16 == 0:
+        # TODO could just int divide by eot_rate, but this lets us start at any int
+        if (self.current_epoch + 1) % self.hparams.eot_rate == 0:
             self.eot_samples += 1
         self.log("eot_samples", self.eot_samples, on_step=False, on_epoch=True, prog_bar=True)
 
@@ -470,8 +471,11 @@ class ObjectDetectionPatch(LightningModule):
         self.log("patch_delta/delta_min", patch_delta.min(), on_step=False, on_epoch=True)
         self.log("patch_delta/delta_std", patch_delta.std(), on_step=False, on_epoch=True)
         self.log("patch_delta/delta_sum", patch_delta.sum(), on_step=False, on_epoch=True)
-        if torch.sum(self.patch < 0) == 0:
-            raise ValueError("Patch values should be non-negative")
-        if torch.sum(self.patch > 255) == 0:
-            raise ValueError("Patch values should be good")
+
         self.log("patch/avg_patch_value", self.patch.mean(), on_step=False, on_epoch=True)
+
+        # TODO cut these since we clamp?
+        if torch.sum(self.patch < 0) != 0:
+            raise ValueError("Patch values should be non-negative")
+        if torch.sum(self.patch > 255) != 0:
+            raise ValueError("Patch values should be good")
