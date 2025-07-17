@@ -144,20 +144,23 @@ class WandbObjectDetectionCallback(Callback):
         if datamodule is None:
             raise ValueError("Datamodule is not set up. Please ensure you have a datamodule configured.")
 
-        self.idx_to_class = getattr(datamodule, "idx_to_class", None)
-        if hasattr(datamodule, "idx_to_class"):
-            self.wandb_classes = wandb.Classes(
+        self.idx_to_class = getattr(datamodule, "idx_to_class", {})
+        if self.idx_to_class is None:
+            self.idx_to_class = {}
+        self.wandb_classes = (
+            wandb.Classes(
                 [
                     {
                         "name": datamodule.idx_to_class[idx],
                         "id": idx,
                         # "color": wandb.utils.generate_color(idx),
                     }
-                    for idx in datamodule.idx_to_class.keys()
+                    for idx in self.idx_to_class.keys()
                 ]
             )
-        else:
-            self.wandb_classes = None
+            if self.idx_to_class
+            else None
+        )
 
         # self.trainer_dataloader_count = len(trainer.train_dataloader) if trainer.train_dataloader else 0
         # self.val_dataloader_count = len(trainer.val_dataloaders[0]) if trainer.val_dataloaders else 0

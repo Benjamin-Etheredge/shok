@@ -4,7 +4,6 @@ from lightning.pytorch import LightningModule
 from torchvision.transforms import v2
 
 from shok.utils.transforms import (
-    ApplyPatch,
     ConvertToTVTensorBBoxes,
     PassRound,
     ScaleApplyPatch,
@@ -12,10 +11,7 @@ from shok.utils.transforms import (
     ScaleImageValues,
     SoftRound,
 )
-
-torch.autograd.set_detect_anomaly(True)
-# TODO test if this hurts performance
-torch.set_float32_matmul_precision("medium")
+from shok.utils.transforms.apply_patch import ApplyPatch
 
 # TODO log average patch size, location, and scale
 # TODO maybe log samples from ds to see how patch is being applied
