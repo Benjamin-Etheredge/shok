@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.0 (2025-07-17)
+
+### Features
+
+- Cleanup (#8) ([`260e63c`](https://github.com/Benjamin-Etheredge/shok/commit/260e63c6c9b0fc956a50f09adbb377bcb14de9fe))
+
+### Bug fixes
+
+- Correcting asserts (#6) ([`e0cbaae`](https://github.com/Benjamin-Etheredge/shok/commit/e0cbaae31524fea8499c37bdce4a859e18e5091a))
+
 ## v0.1.1 (2025-07-17)
 
 ### Bug fixes
