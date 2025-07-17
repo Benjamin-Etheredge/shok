@@ -36,6 +36,7 @@ dependencies = [
   "torchmetrics>=1.7.4",
   "torchvision>=0.22.1",
   "typer>=0.15,<1",
+  "wandb>=0.21.0", # TODO move this to elsewhere?
 ]
 urls."Bug Tracker" = "https://github.com/benjamin-etheredge/shok/issues"
 urls.Changelog = "https://github.com/benjamin-etheredge/shok/blob/main/CHANGELOG.md"

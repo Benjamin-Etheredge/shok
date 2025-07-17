@@ -4398,6 +4398,7 @@ dependencies = [
     { name = "torchmetrics" },
     { name = "torchvision" },
     { name = "typer" },
+    { name = "wandb" },
 ]
 
 [package.dev-dependencies]
@@ -4431,6 +4432,7 @@ requires-dist = [
     { name = "torchmetrics", specifier = ">=1.7.4" },
     { name = "torchvision", specifier = ">=0.22.1" },
     { name = "typer", specifier = ">=0.15,<1" },
+    { name = "wandb", specifier = ">=0.21.0" },
 ]
 
 [package.metadata.requires-dev]
