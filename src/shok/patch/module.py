@@ -1,6 +1,6 @@
+import lightning.pytorch
 import torch
 import torchmetrics
-from lightning.pytorch import LightningModule
 from torchvision.transforms import v2
 
 from shok.utils.transforms import (
@@ -17,7 +17,7 @@ from shok.utils.transforms.apply_patch import ApplyPatch
 # TODO maybe log samples from ds to see how patch is being applied
 
 
-class ObjectDetectionPatch(LightningModule):
+class ObjectDetectionPatch(lightning.pytorch.LightningModule):
     """
     ObjectDetectionPatch is a PyTorch Lightning module designed for adversarial patch training in object detection models.
 
@@ -25,44 +25,6 @@ class ObjectDetectionPatch(LightningModule):
     This module manages the creation, optimization, and application of an adversarial patch to input images,
     with the goal of affecting object detection performance. It supports expectation over transformation (EOT)
     sampling, custom image mutators, gradient accumulation, and evaluation using mean average precision (mAP).
-        model: The object detection model to attack. Its parameters are frozen during patch training.
-        patch_shape (tuple[int, int, int], optional): Shape of the adversarial patch (channels, height, width).
-            Defaults to (3, 2048, 2048).
-        learning_rate (float, optional): Learning rate for patch optimization. Defaults to 20.0.
-        targeted (bool, optional): Whether the attack is targeted. Defaults to False.
-        verbose (bool, optional): If True, enables verbose logging. Defaults to True.
-        clip_values (tuple[float, float] | None, optional): Min and max values to clip the patch. Defaults to (0, 255).
-        use_y_hat (bool, optional): If True, uses model predictions as targets. Defaults to False.
-        gamma (float, optional): Learning rate decay factor for the scheduler. Defaults to 0.995.
-        base_image_mutator (v2.Compose | bool | None, optional): Transform for base images. Defaults to None.
-        patched_image_mutator (v2.Compose | bool, optional): Transform for patched images. Defaults to False.
-        eot_samples (int, optional): Number of EOT samples per batch. Defaults to 1.
-
-    Attributes:
-        patch (torch.nn.Parameter): The adversarial patch being optimized.
-        patched_image_mutator: Transform applied to patched images.
-        combiner: Callable for applying the patch to images.
-        other_transforms: Compose of transforms applied after patching.
-        eval_combiner: Compose of transforms for evaluation.
-        eval_maps (torch.nn.ModuleList): List of mAP metrics for evaluation.
-        automatic_optimization (bool): Disables automatic optimization for manual control.
-        grad_accumulation_steps (int): Number of gradient accumulation steps.
-        record_count (int): Counter for processed records.
-        eot_samples (int): Number of EOT samples per batch.
-
-    Methods:
-        setup(stage: str): Sets up the module for training or evaluation.
-        train(mode=True): Sets training/evaluation mode for the model and normalization layers.
-        configure_optimizers(): Configures the optimizer and learning rate scheduler for patch optimization.
-        on_validation_epoch_start(): Switches the model to evaluation mode at the start of validation.
-        validation_step(batch, batch_idx, dataloader_idx): Performs a validation step and logs metrics.
-        on_train_epoch_start(): Switches the model to training mode at the start of each epoch.
-        eot_sample_batches(batch): Yields EOT-sampled batches for robust patch training.
-        _should_update(batch_idx: int) -> bool: Determines if an optimizer update should occur.
-        on_train_batch_start(batch, batch_idx): Updates record count at the start of each batch.
-        on_train_epoch_end(): Increments EOT samples and logs at the end of each epoch.
-        training_step(batch, batch_idx): Performs a training step with EOT sampling and manual backward.
-        _update(): Applies optimizer step, clamps patch values, logs patch statistics, and resets gradients.
 
     Notes:
         - The module is designed for adversarial patch training and evaluation in object detection tasks.
@@ -93,6 +55,26 @@ class ObjectDetectionPatch(LightningModule):
         eot_rate: int = 32,
         # TODO should this just get pulled/set from the trainer?
     ):
+        """
+        Initializes the patch module for adversarial patch training.
+
+        Args:
+            model: The neural network model to be patched.
+            patch_shape (tuple[int, int, int], optional): Shape of the adversarial patch (channels, height, width).
+            learning_rate (float, optional): Learning rate for patch optimization.
+            targeted (bool, optional): Whether the attack is targeted.
+            verbose (bool, optional): If True, enables verbose output.
+            clip_values (tuple[float, float] | None, optional): Min and max values to clip patch pixel values.
+            use_y_hat (bool, optional): If True, uses predicted labels for certain operations.
+            gamma (float, optional): Decay factor for learning rate or other scheduling.
+            patch_combiner (torch.nn.Module | None, optional): Module to combine patch with input images during training.
+            val_patch_combiner (torch.nn.Module | None, optional): Module to combine patch with input images during validation.
+            patched_image_transforms (torch.nn.Module | None, optional): Transforms applied to patched images during training.
+            val_patched_image_transforms (torch.nn.Module | None, optional): Transforms applied to patched images during validation.
+            eot_samples (int, optional): Number of samples for Expectation over Transformation (EOT).
+            eot_rate (int, optional): Rate at which EOT is applied.
+
+        """
         super().__init__()
         self.save_hyperparameters(
             ignore=[
