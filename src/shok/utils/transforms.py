@@ -110,10 +110,8 @@ class ApplyPatch(torch.nn.Module):
         rounded_shape = torch.round(scaled_shape)
         rounded_size = rounded_shape.to(torch.int32)
         size = rounded_size
-        # ic(size)
         # size = rounded_size.tolist()
         # size = torch.round(torch.tensor(x_copy.shape[1:]) * patch_scale).to(torch.int32).tolist()
-        # ic(size)
         # patch = F.resize(
         #     patch,
         #     size=size,
@@ -126,13 +124,10 @@ class ApplyPatch(torch.nn.Module):
             # ratio=self.patch_crop_range,
         )
         patch = resized_crop(patch)
-        # ic(size)
-        # ic(patch.shape)
 
         # pad_top = torch.ceil(patch.shape[1] / 2).to(torch.int32).item()
         # pad_bottom = torch.floor(patch.shape[1] / 2).to(torch.int32).item()
         # pad_left = torch.ceil(patch.shape[2] / 2).to(torch.int32).item()
-        # ic(patch.shape, pad_top, pad_left)
 
         # pad out the image to allow patch to be placed at edges of image
         # left_right_pad = torch.tensor(patch.shape[1])
@@ -203,17 +198,18 @@ class ApplyPatch(torch.nn.Module):
         # handle patch going off the edges of the image
         x_2 = x_1 + patch.shape[-2]
         y_2 = y_1 + patch.shape[-1]
-        if x_2 <= x_copy.shape[-2]:
-            raise ValueError("Patch exceeds image width")
-        if y_2 <= x_copy.shape[-1]:
-            raise ValueError("Patch exceeds image height")
+
+        if x_2 > x_copy.shape[-2]:
+            raise ValueError(f"Patch exceeds image width: {x_2} > {x_copy.shape[-2]}")
+        if y_2 > x_copy.shape[-1]:
+            raise ValueError(f"Patch exceeds image height: {y_2} > {x_copy.shape[-1]}")
+
         # patch_x_1 = max(0, x_1)
         # height = y_2-y_1
         # width = x_2-x_1
         x_copy[..., x_1:x_2, y_1:y_2] = patch
 
         # crop back down
-        # TODO i've
         # x_copy = x_copy[:, top_bottom_pad:-top_bottom_pad, left_right_pad:-left_right_pad]
         # x_copy = x_copy[:, top_bottom_pad:-top_bottom_pad, left_right_pad:-left_right_pad]
         # x_copy = x_copy[:, left_pad:-right_pad, top_pad:-bottom_pad]
@@ -275,16 +271,18 @@ class ScaleApplyPatch(torch.nn.Module):
     This is useful for evaluating patch effectiveness.
     """
 
-    def __init__(self, scale=0.25):
+    def __init__(self, scale=0.25, preserve_aspect_ratio=True):
         """
         Initializes the object with a specified scale factor.
 
         Args:
             scale (float, optional): The scale factor to be used. Defaults to 0.25.
+            preserve_aspect_ratio (bool, optional): Whether to preserve the aspect ratio during scaling. Defaults to True.
 
         """
         super().__init__()
         self.scale = scale
+        self.preserve_aspect_ratio = preserve_aspect_ratio
 
     def forward(self, x: torch.Tensor, patch: torch.Tensor, y: torch.Tensor = None) -> torch.Tensor:
         """
@@ -310,10 +308,14 @@ class ScaleApplyPatch(torch.nn.Module):
         x_copy = x.clone()
 
         # Scale the patch to a fixed size
+        if self.preserve_aspect_ratio:
+            # TODO implement aspect ratio preservation
+            pass
+
         size = torch.round(torch.tensor(x.shape[1:]) * self.scale).to(torch.int32).tolist()
         patch = F.resize(patch, size=size)
 
-        x_copy[:, : patch.shape[1], : patch.shape[2]] = patch
+        x_copy[..., : patch.shape[-2], : patch.shape[-1]] = patch
 
         # TODO pull out or find built-in for this
         y_copy = y.copy() if y is not None else None
