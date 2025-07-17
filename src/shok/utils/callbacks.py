@@ -2,12 +2,11 @@ import time
 
 import lightning as L
 import torch
+import wandb
 from lightning.pytorch import Trainer
 from lightning.pytorch.callbacks import Callback
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.utilities import rank_zero_only
-
-import wandb
 
 
 def translate_pred_to_wandb_boxes(preds, patch_image):

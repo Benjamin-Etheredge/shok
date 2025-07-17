@@ -4402,9 +4402,6 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-coco = [
-    { name = "faster-coco-eval" },
-]
 dev = [
     { name = "coverage" },
     { name = "pytest" },
@@ -4415,9 +4412,6 @@ docs = [
     { name = "myst-parser", marker = "python_full_version >= '3.11'" },
     { name = "sphinx", marker = "python_full_version >= '3.11'" },
     { name = "sphinx-autobuild", marker = "python_full_version >= '3.11'" },
-]
-extra = [
-    { name = "wandb" },
 ]
 
 [package.metadata]
@@ -4436,7 +4430,6 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-coco = [{ name = "faster-coco-eval" }]
 dev = [
     { name = "coverage" },
     { name = "pytest", specifier = ">=8,<9" },
@@ -4448,7 +4441,6 @@ docs = [
     { name = "sphinx", marker = "python_full_version >= '3.11'", specifier = ">=4" },
     { name = "sphinx-autobuild", marker = "python_full_version >= '3.11'", specifier = ">=2024,<2025" },
 ]
-extra = [{ name = "wandb", specifier = ">=0.21.0" }]
 
 [[package]]
 name = "simplejson"

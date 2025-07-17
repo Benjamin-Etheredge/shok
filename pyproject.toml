@@ -56,13 +56,6 @@ docs = [
   "sphinx>=4; python_version>='3.11'",
   "sphinx-autobuild>=2024,<2025; python_version>='3.11'",
 ]
-# For using coco example
-coco = [
-  "faster-coco-eval",
-]
-extra = [
-  "wandb>=0.21.0",
-]
 
 [tool.ruff]
 line-length = 120
@@ -98,6 +91,10 @@ lint.per-file-ignores."tests/**/*" = [
   "S101",
 ]
 lint.isort.known-first-party = [ "shok", "tests" ]
+# Having a wandb folder for logging breaks ruff formating
+lint.isort.known-third-party = [
+  "wandb",
+]
 
 lint.pycodestyle.ignore-overlong-task-comments = true
 lint.task-tags = ["HACK", "TODO", "NOTE"]
