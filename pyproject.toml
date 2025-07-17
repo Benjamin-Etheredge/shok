@@ -26,8 +26,17 @@ classifiers = [
 ]
 
 dependencies = [
+  "faster-coco-eval>=1.6.7", # TODO move this to elsewhere?
+  "fiftyone>=1.7.0",
+  "icecream>=2.1.5",
+  "jsonargparse[signatures]>=4.40.0",
+  "lightning>=2.5.2",
   "rich>=10",
+  "torch>=2.7.1",
+  "torchmetrics>=1.7.4",
+  "torchvision>=0.22.1",
   "typer>=0.15,<1",
+  "wandb>=0.21.0", # TODO move this to elsewhere?
 ]
 urls."Bug Tracker" = "https://github.com/benjamin-etheredge/shok/issues"
 urls.Changelog = "https://github.com/benjamin-etheredge/shok/blob/main/CHANGELOG.md"
@@ -49,7 +58,7 @@ docs = [
 ]
 
 [tool.ruff]
-line-length = 88
+line-length = 120
 lint.select = [
   "B",   # flake8-bugbear
   "D",   # flake8-docstrings
@@ -82,6 +91,14 @@ lint.per-file-ignores."tests/**/*" = [
   "S101",
 ]
 lint.isort.known-first-party = [ "shok", "tests" ]
+# Having a wandb folder for logging breaks ruff formating
+lint.isort.known-third-party = [
+  "wandb",
+]
+
+lint.pycodestyle.ignore-overlong-task-comments = true
+lint.task-tags = ["HACK", "TODO", "NOTE"]
+lint.pycodestyle.max-line-length = 160
 
 [tool.pytest.ini_options]
 addopts = """\
