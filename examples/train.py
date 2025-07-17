@@ -1,3 +1,4 @@
+import torch
 from jsonargparse import lazy_instance
 from lightning.pytorch.cli import LightningCLI
 from torchvision.models.detection import (
@@ -14,6 +15,9 @@ default_model = {
         "weights": FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT,
     },
 }
+torch.autograd.set_detect_anomaly(True)
+# TODO test if this hurts performance
+torch.set_float32_matmul_precision("medium")
 
 
 class CustomLightningCLI(LightningCLI):
