@@ -175,7 +175,7 @@ class CocoDataModule(LightningDataModule):
             num_workers=max(1, min(8, os.cpu_count() // 2)),
             persistent_workers=True,
             pin_memory=True,
-            collate_fn=lambda x: tuple(zip(*x)),  # Unpack the dataset
+            collate_fn=lambda x: tuple(zip(*x, strict=True)),  # Unpack the dataset
         )
 
     def val_dataloader(self):
@@ -203,7 +203,7 @@ class CocoDataModule(LightningDataModule):
             num_workers=max(1, min(8, os.cpu_count() // 2)),
             persistent_workers=True,
             pin_memory=True,
-            collate_fn=lambda x: tuple(zip(*x)),  # Unpack the dataset
+            collate_fn=lambda x: tuple(zip(*x, strict=True)),  # Unpack the dataset
         )
         val2 = torch.utils.data.DataLoader(
             self.val_dataset,
@@ -212,7 +212,7 @@ class CocoDataModule(LightningDataModule):
             num_workers=max(1, min(8, os.cpu_count() // 2)),
             persistent_workers=True,
             pin_memory=True,
-            collate_fn=lambda x: tuple(zip(*x)),  # Unpack the dataset
+            collate_fn=lambda x: tuple(zip(*x, strict=True)),  # Unpack the dataset
         )
         return {
             "clean_train": val1,

@@ -209,23 +209,15 @@ class ObjectDetectionPatch(LightningModule):
             for param in self.model.parameters():
                 if isinstance(
                     param,
-                    (
-                        torch.nn.BatchNorm2d,
-                        torch.nn.GroupNorm,
-                        torch.nn.InstanceNorm2d,
-                        torch.nn.LayerNorm,
-                        torch.nn.LocalResponseNorm,
-                        torch.nn.SyncBatchNorm,
-                        torch.nn.modules.MultiheadAttention,
-                        # torch.nn.modules.dropout._Dropout,
-                        torch.nn.modules.dropout._DropoutNd,
-                        torch.nn.modules.batchnorm._BatchNorm,
-                        # torch.nn.modules.normalization._GroupNorm,
-                        # torch.nn.modules.normalization._InstanceNorm,
-                        # torch.nn.modules.normalization._LayerNorm,
-                        # torch.nn.modules.normalization._LocalResponseNorm,
-                        # torch.nn.modules.normalization._SyncBatchNorm,
-                    ),
+                    torch.nn.BatchNorm2d
+                    | torch.nn.GroupNorm
+                    | torch.nn.InstanceNorm2d
+                    | torch.nn.LayerNorm
+                    | torch.nn.LocalResponseNorm
+                    | torch.nn.SyncBatchNorm
+                    | torch.nn.modules.MultiheadAttention
+                    | torch.nn.modules.dropout._DropoutNd
+                    | torch.nn.modules.batchnorm._BatchNorm,
                 ):
                     param.eval()
                     param.weight.requires_grad = False
@@ -283,7 +275,7 @@ class ObjectDetectionPatch(LightningModule):
             tuple: Transformed images and targets after applying the patch.
 
         """
-        x, y = zip(*[combiner(image, patch, target) for image, target in zip(x, y)])
+        x, y = zip(*[combiner(image, patch, target) for image, target in zip(x, y, strict=False)], strict=False)
         return x, y
 
     def validation_step(self, batch, batch_idx, dataloader_idx):
@@ -291,7 +283,10 @@ class ObjectDetectionPatch(LightningModule):
         # TODO implement a validation step for the patch
         x, y = batch
         x, y = self._apply_patch(x, self.patch, y, self.val_patch_combiner)
-        x, y = zip(*[self.val_patched_image_transforms(image, target) for image, target in zip(x, y)])
+        x, y = zip(
+            *[self.val_patched_image_transforms(image, target) for image, target in zip(x, y, strict=False)],
+            strict=True,
+        )
 
         detections = self.model(x, y)
 
@@ -344,7 +339,7 @@ class ObjectDetectionPatch(LightningModule):
         for _ in range(self.eot_samples):
             eot_batch = ([], [])
             # new_x, new_y = self._apply_patch(image, self.patch, target, self.patch_combiner)
-            for image, target in zip(batch[0], batch[1]):
+            for image, target in zip(batch[0], batch[1], strict=True):
                 new_x, new_y = self.patch_combiner(image, self.patch, target)
                 new_x, new_y = self.patched_image_transforms(new_x, new_y)
                 eot_batch[0].append(new_x)

@@ -29,7 +29,7 @@ def translate_pred_to_wandb_boxes(preds, patch_image):
     if "scores" not in preds:
         # could be ground truth
         preds["scores"] = [torch.tensor(100.0)] * len(preds["boxes"])
-    for box, score, label in zip(preds["boxes"], preds["scores"], preds["labels"]):
+    for box, score, label in zip(preds["boxes"], preds["scores"], preds["labels"], strict=True):
         box_data.append(translate_pytorch_boxes_to_wandb(box, score, label, patch_image))
     return {
         "predictions": {
