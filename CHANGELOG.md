@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.0 (2025-07-19)
+
+### Features
+
+- Add initial devcontainer and automation configuration (#10) ([`fa6ecab`](https://github.com/Benjamin-Etheredge/shok/commit/fa6ecab819afae091c5eaebf7770317f66240827))
+
 ## v0.2.0 (2025-07-17)
 
 ### Features
