@@ -66,7 +66,12 @@ class ApplyPatch(torch.nn.Module):
         self.color_jitter = v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)
 
     # TODO switch to crop then resize? use resized_crop?
-    def forward(self, x: torch.Tensor, patch: torch.Tensor, y: torch.Tensor = None) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor | list[torch.Tensor],
+        patch: torch.Tensor,
+        y: torch.Tensor | list[torch.Tensor] | dict | None = None,
+    ) -> tuple[torch.Tensor | list[torch.Tensor], dict | None]:
         """
         Forward method.
 
@@ -86,6 +91,23 @@ class ApplyPatch(torch.nn.Module):
                 - The updated target tensor (if provided), otherwise None.
 
         """
+        if isinstance(x, list | tuple):
+            # If x is a list, apply the patch to each tensor in the list
+            if y is None:
+                y = [None] * len(x)
+
+            x_copy = [self._apply_patch_single(xi, patch, yi) for xi, yi in zip(x, y, strict=True)]
+            return x_copy
+        elif isinstance(x, torch.Tensor):
+            # If x is a single tensor, apply the patch directly
+            return self._apply_patch_single(x, patch, y)
+        else:
+            raise TypeError(f"Unsupported type for x: {type(x)}. Expected torch.Tensor or list of torch.Tensor.")
+
+    def _apply_patch_single(
+        self, x: torch.Tensor, patch: torch.Tensor, y: torch.Tensor | None = None
+    ) -> tuple[torch.Tensor, dict | None]:
+        """Applies a patch to a single input tensor `x`."""
         x_copy = x.clone()
 
         # NOTE do the rotation before computing and using the sizes

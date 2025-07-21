@@ -1,5 +1,7 @@
 from .apply_patch import ApplyPatch
 from .convert_to_tv_tensor_bboxes import ConvertToTVTensorBBoxes
+from .list_compose import ListCompose
+from .list_wrapper import BatchListTransformWrapper, ListTransformWrapper, create_list_transform
 from .pass_round import PassRound
 from .scale_apply_patch import ScaleApplyPatch
 from .scale_grad_transform import ScaleGradTransform
@@ -9,11 +11,15 @@ from .target_insurance import TargetInsurance
 
 __all__ = [
     "ApplyPatch",
+    "BatchListTransformWrapper",
     "ConvertToTVTensorBBoxes",
+    "ListCompose",
+    "ListTransformWrapper",
     "PassRound",
     "ScaleApplyPatch",
     "ScaleGradTransform",
     "ScaleImageValues",
     "SoftRound",
     "TargetInsurance",
+    "create_list_transform",
 ]

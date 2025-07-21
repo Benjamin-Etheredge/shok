@@ -214,6 +214,7 @@ class CocoDataModule(LightningDataModule):
             pin_memory=True,
             collate_fn=lambda x: tuple(zip(*x, strict=True)),  # Unpack the dataset
         )
+        return [val1, val2]
         return {
             "clean_train": val1,
             "val": val2,

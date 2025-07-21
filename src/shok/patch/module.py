@@ -1,8 +1,8 @@
 import lightning.pytorch
 import torch
-import torchmetrics
 from torchvision.transforms import v2
 
+from shok.utils.callbacks.map import MeanAveragePrecisionCallback
 from shok.utils.transforms import (
     ConvertToTVTensorBBoxes,
     PassRound,
@@ -42,7 +42,7 @@ class ObjectDetectionPatch(lightning.pytorch.LightningModule):
         targeted: bool = False,
         # summary_writer: str | bool | SummaryWriter = False,
         verbose: bool = True,
-        clip_values: tuple[float, float] | None = (0, 255),
+        clip_values: tuple[float, float] = (0, 255),
         use_y_hat: bool = False,
         gamma: float = 0.995,
         patch_combiner: torch.nn.Module | None = None,
@@ -111,8 +111,12 @@ class ObjectDetectionPatch(lightning.pytorch.LightningModule):
         if patched_image_transforms is None:
             patched_image_transforms = v2.Identity()
 
+        # self.patch_combiner = ListTransformWrapper(self.patch_combiner)
+        self.patch_combiner = self.patch_combiner
+
         # TODO assert transforms don't go outside clip values
         # These other transforms are needed for the generation
+        # self.patched_image_transforms = ListCompose(
         self.patched_image_transforms = v2.Compose(
             [
                 SoftRound(),
@@ -124,12 +128,15 @@ class ObjectDetectionPatch(lightning.pytorch.LightningModule):
                 v2.SanitizeBoundingBoxes(),
             ]
         )
+        self.patched_image_transforms = self.patched_image_transforms
 
         if val_patch_combiner is None:
             val_patch_combiner = ScaleApplyPatch(0.25)
+        # self.val_patch_combiner = ListTransformWrapper(val_patch_combiner)
         self.val_patch_combiner = val_patch_combiner
 
         if val_patched_image_transforms is None:
+            # val_patched_image_transforms = ListCompose(
             val_patched_image_transforms = v2.Compose(
                 [
                     PassRound(),
@@ -144,20 +151,20 @@ class ObjectDetectionPatch(lightning.pytorch.LightningModule):
 
         self.eot_samples = eot_samples
 
-        # TODO pull out or move to setup
-        # TODO move to callback
-        self.eval_maps = torch.nn.ModuleList(
-            [
-                torchmetrics.detection.MeanAveragePrecision(
-                    iou_type="bbox",
-                    backend="faster_coco_eval",
-                ),
-                torchmetrics.detection.MeanAveragePrecision(
-                    iou_type="bbox",
-                    backend="faster_coco_eval",
-                ),
-            ]
-        )
+    def configure_callbacks(self):
+        """
+        Configures the callbacks for the patch module.
+
+        This method sets up the callbacks used during training and validation,
+        including mean average precision (mAP) metrics for both training and validation phases.
+        It initializes the callbacks with appropriate parameters and ensures they are ready for use.
+
+        """
+        map_callback = MeanAveragePrecisionCallback()
+        return [
+            map_callback,
+            # TODO add other callbacks here
+        ]
 
     def train(self, mode=True):
         """
@@ -178,8 +185,6 @@ class ObjectDetectionPatch(lightning.pytorch.LightningModule):
             - Contains commented-out code and TODOs for future cleanup.
 
         """
-        # self.training = mode
-        # return self
         super().train(mode)
         # TODO clean up now that bug was found
         if mode:
@@ -206,11 +211,6 @@ class ObjectDetectionPatch(lightning.pytorch.LightningModule):
                     param.bias.requires_grad = False
         return self
 
-        if mode:
-            self.model.train()
-        else:
-            self.model.eval()
-
     # TODO explore overriding configure gradient clipping for scalling
     def configure_optimizers(self):
         """Configure the optimizer for the patch."""
@@ -230,6 +230,25 @@ class ObjectDetectionPatch(lightning.pytorch.LightningModule):
             "optimizer": opt,
             "lr_scheduler": lr_scheduler,
         }
+
+    def forward(self, x, y=None):
+        """
+        Forward pass through the model with the adversarial patch applied.
+
+        Args:
+            x (torch.Tensor): Input images.
+            y (torch.Tensor, optional): Corresponding targets (not used in this method).
+
+        Returns:
+            torch.Tensor: Model predictions after applying the adversarial patch.
+
+        """
+        # Apply the patch to the input images
+        x, _ = self.val_patch_combiner(x, self.patch, y)
+        x = self.val_patched_image_transforms(x, y)
+
+        # Forward pass through the model
+        return self.model(x, y)
 
     def on_validation_epoch_start(self):
         """
@@ -272,20 +291,21 @@ class ObjectDetectionPatch(lightning.pytorch.LightningModule):
 
         detections = self.model(x, y)
 
-        metrics = self.eval_maps[dataloader_idx](preds=detections, target=y)
-        # TODO figure out how to log
-        metrics["classes"]
-        del metrics["classes"]  # Remove classes from metrics to avoid logging it
-        metrics = {f"val_{dataloader_idx}_map/{k}": v for k, v in metrics.items()}
-        # self.log_dict(self.eval_maps[dataloader_idx], on_step=False, on_epoch=True, prog_bar=False, add_dataloader_idx=True)
-        self.log_dict(
-            metrics,
-            on_step=False,
-            on_epoch=True,
-            prog_bar=False,
-            batch_size=len(x),
-            add_dataloader_idx=False,
-        )
+        return detections
+
+        # metrics = self.val_maps[dataloader_idx](preds=detections, target=y)
+        # # TODO figure out how to log
+        # metrics["classes"]
+        # del metrics["classes"]  # Remove classes from metrics to avoid logging it
+        # metrics = {f"val_{dataloader_idx}_map/{k}": v for k, v in metrics.items()}
+        # self.log_dict(
+        #     metrics,
+        #     on_step=False,
+        #     on_epoch=True,
+        #     prog_bar=False,
+        #     batch_size=len(x),
+        #     add_dataloader_idx=False,
+        # )
 
     # TODO include train model and eval model maybe?
     # TODO explore using truth labels vs model predictions
@@ -321,6 +341,8 @@ class ObjectDetectionPatch(lightning.pytorch.LightningModule):
         for _ in range(self.eot_samples):
             eot_batch = ([], [])
             # new_x, new_y = self._apply_patch(image, self.patch, target, self.patch_combiner)
+
+            # yield self.patch_combiner()
             for image, target in zip(batch[0], batch[1], strict=True):
                 new_x, new_y = self.patch_combiner(image, self.patch, target)
                 new_x, new_y = self.patched_image_transforms(new_x, new_y)
@@ -384,8 +406,12 @@ class ObjectDetectionPatch(lightning.pytorch.LightningModule):
         """
         # NOTE doing this here insures that the exact same images are used for each eot sample
         # TODO maybe pull this out and augement dataset and trainer instead
+        # for _ in range(self.eot_samples):
         for eot_batch in self.eot_sample_batches(batch):
             x, y = eot_batch
+            # x, y = batch
+            # x, y = self.patch_combiner(x, self.patch, y)
+            # x, y = self.patched_image_transforms(x, y)
             losses = self.model(x, y)
             self.log_dict(
                 losses,

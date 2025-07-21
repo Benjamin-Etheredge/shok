@@ -22,7 +22,12 @@ class ScaleApplyPatch(torch.nn.Module):
         self.scale = scale
         self.preserve_aspect_ratio = preserve_aspect_ratio
 
-    def forward(self, x: torch.Tensor, patch: torch.Tensor, y: torch.Tensor = None) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor | list[torch.Tensor],
+        patch: torch.Tensor,
+        y: torch.Tensor | list[torch.Tensor] | None = None,
+    ) -> tuple[torch.Tensor | list[torch.Tensor], dict | None]:
         """
         Applies a scaled patch to the input tensor `x` and optionally adjusts target annotations `y`.
 
@@ -43,6 +48,23 @@ class ScaleApplyPatch(torch.nn.Module):
             - If "boxes" or "labels" are missing in `y`, they are initialized as empty tensors.
 
         """
+        if isinstance(x, list | tuple):
+            # If x is a list, apply the patch to each tensor in the list
+            if y is None:
+                y = [None] * len(x)
+
+            x_copy = [self._apply_patch_single(xi, patch, yi) for xi, yi in zip(x, y, strict=True)]
+            return x_copy
+        elif isinstance(x, torch.Tensor):
+            # If x is a single tensor, apply the patch directly
+            return self._apply_patch_single(x, patch, y)
+        else:
+            raise TypeError(f"Unsupported type for x: {type(x)}. Expected torch.Tensor or list of torch.Tensor.")
+
+    def _apply_patch_single(
+        self, x: torch.Tensor, patch: torch.Tensor, y: torch.Tensor | None = None
+    ) -> tuple[torch.Tensor, dict | None]:
+        """Applies a patch to a single input tensor `x`."""
         x_copy = x.clone()
 
         # Scale the patch to a fixed size
