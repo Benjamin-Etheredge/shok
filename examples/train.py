@@ -7,7 +7,7 @@ from torchvision.models.detection import (
 
 from shok.data.datasets.coco import CocoDataModule
 from shok.patch.module import ObjectDetectionPatch
-from shok.utils.callbacks import LogPerformanceCallback, WandbObjectDetectionCallback
+from shok.utils.callbacks.wandb import LogPerformanceCallback, WandbObjectDetectionCallback
 
 default_model = {
     "class_path": "torchvision.models.detection.fasterrcnn_resnet50_fpn_v2",

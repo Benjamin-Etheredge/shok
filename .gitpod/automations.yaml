@@ -1,18 +1,17 @@
 tasks:
   command-0:
+    name: "Task 0: UV Setup"
     command: |
       pip install uv
       PIP_USER=false uv sync
-    description: init task migrated from .gitpod.yml
-    name: "Task 0: command"
     triggeredBy:
       - postDevcontainerStart
   command-1:
+    name: "Task 1: Pre-commit Setup"
     command: |
       pip install pre-commit
       pre-commit install
       PIP_USER=false pre-commit install-hooks
-    description: init task migrated from .gitpod.yml
-    name: "Task 1: command"
+      PIP_USER=false pre-commit install --install-hooks -t commit-msg
     triggeredBy:
       - postDevcontainerStart

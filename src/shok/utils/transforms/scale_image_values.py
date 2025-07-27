@@ -1,3 +1,5 @@
+from typing import Any
+
 import torch
 
 
@@ -10,12 +12,12 @@ class ScaleImageValues(torch.nn.Module):
     """
 
     # this is used since the other transforms can mess with labels
-    def __init__(self, min=0, max=255):
+    def __init__(self, min: int | float = 0, max: int | float = 255):
         super().__init__()
         self.min = min
         self.max = max
 
-    def forward(self, x: torch.Tensor, y=None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, y: Any = None) -> tuple[torch.Tensor, Any]:
         """
         Scale the image values to be between 0 and 1.
 

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from lightning.pytorch.loggers import WandbLogger
 
-from shok.utils.callbacks import WandbObjectDetectionCallback
+from shok.utils.callbacks.wandb import WandbObjectDetectionCallback
 
 
 @pytest.fixture

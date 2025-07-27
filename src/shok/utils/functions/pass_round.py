@@ -17,7 +17,7 @@ class PassRound(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(ctx, x):
+    def forward(ctx, x: torch.Tensor) -> torch.Tensor:
         """
         Rounds each element of the input tensor to the nearest integer.
 
@@ -32,7 +32,7 @@ class PassRound(torch.autograd.Function):
         return torch.round(x)
 
     @staticmethod
-    def backward(ctx, grad_output):
+    def backward(ctx, grad_output: torch.Tensor) -> torch.Tensor:
         """
         Computes the gradient of the output with respect to the input during the backward pass.
 
